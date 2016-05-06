@@ -14,7 +14,7 @@ double Svtx(PHG4Reco* g4Reco, double radius,
 	    const int absorberactive = 0,
 	    int verbosity = 0) {
 
-  float svtx_inner_radius = 2.335; // based on the ALICE ITS (same beam pipe as ours)
+  float svtx_inner_radius = 2.3; 
   
   if (radius > svtx_inner_radius) {
     cout << "inconsistency: radius: " << radius 
@@ -39,9 +39,9 @@ double Svtx(PHG4Reco* g4Reco, double radius,
   // 2 MAPS: 0.3% X_0  (0.053% sensor + 0.247% support) sensor =  50 mc Si, support =  35 mc Cu
   
   double si_thickness[3] = {0.0050, 0.0050, 0.0050};
-  double svxrad[3] = {svtx_inner_radius, 3.132, 3.904};
-  double support_thickness[3] = {0.0035, 0.0035, 0.0035};
-  double length[3] = {27., 27., 27.};
+  double svxrad[3] = {svtx_inner_radius, 3.2, 3.9};
+  double support_thickness[3] = {0.0036, 0.0036, 0.0036};
+  double length[3] = {27.0, 27.0, 27.0};
 
   for (int ilayer=0;ilayer<n_svx_layer;++ilayer) {
     cyl = new PHG4CylinderSubsystem("SVTX", ilayer);
@@ -138,11 +138,9 @@ void Svtx_Cells(int verbosity = 0)
   // SVTX cells
   //-----------
 
-  // 50 micron pixels + 60 micron strips
-  double svxcellsizex[2] = {0.0028, 0.0028, 0.0028};
-
-  // 425 micron pixels + 9.6 mm tracking strips
-  double svxcellsizey[2] = {0.0028, 0.0028, 0.0028};
+  // 28 um / sqrt(2) from typical cluster size (not yet simulated for MAPS)
+  double svxcellsizex[3] = {0.0020, 0.0020, 0.0020};
+  double svxcellsizey[3] = {0.0020, 0.0020, 0.0020};
 
   double diffusion = 0.0057;
   double electrons_per_kev = 38.;
@@ -204,9 +202,9 @@ void Svtx_Reco(int verbosity = 0)
   
   PHG4SvtxDeadArea* deadarea = new PHG4SvtxDeadArea();
   deadarea->Verbosity(verbosity);
-  deadarea->set_hit_efficiency(0,0.998);
-  deadarea->set_hit_efficiency(1,0.998);
-  deadarea->set_hit_efficiency(2,0.998);
+  deadarea->set_hit_efficiency(0,0.99);
+  deadarea->set_hit_efficiency(1,0.99);
+  deadarea->set_hit_efficiency(2,0.99);
   se->registerSubsystem( deadarea );
 
   //-----------------------------
@@ -215,16 +213,16 @@ void Svtx_Reco(int verbosity = 0)
 
   PHG4SvtxThresholds* thresholds = new PHG4SvtxThresholds();
   thresholds->Verbosity(verbosity);
-  thresholds->set_threshold(0,0.33);
-  thresholds->set_threshold(1,0.33);
-  thresholds->set_threshold(2,0.33);
-  thresholds->set_use_thickness_mip(0, true);
+  thresholds->set_threshold(0,0.25);
+  thresholds->set_threshold(1,0.25);
+  thresholds->set_threshold(2,0.25);
   se->registerSubsystem( thresholds );
 
   //-------------
   // Cluster Hits
   //------------- 
-  PHG4TPCClusterizer* clusterizer = new PHG4TPCClusterizer("PHG4SvtxClusterizer",4,1);;
+
+  PHG4TPCClusterizer* clusterizer = new PHG4TPCClusterizer("PHG4SvtxClusterizer",4,1);
   se->registerSubsystem( clusterizer );
 
   //---------------------
@@ -243,12 +241,12 @@ void Svtx_Reco(int verbosity = 0)
   hough->setZBinScale(1.0);
 
   hough->Verbosity(0);
-  double mat_scale = 1.0;
-  hough->set_material(0, mat_scale*0.003);
-  hough->set_material(1, mat_scale*0.003);
-  hough->set_material(2, mat_scale*0.003);
-  for (int i=3;i<63;++i) {
-    hough->set_material(i, mat_scale*0.06/60.);
+  hough->set_material(0, 0.003);
+  hough->set_material(1, 0.003);
+  hough->set_material(2, 0.003);
+  hough->set_material(3, 0.010);
+  for (int i=4;i<63;++i) {
+    hough->set_material(i, 0.060/60.);
   }
   hough->setUseCellSize(false);
   
@@ -309,15 +307,15 @@ void Svtx_Eval(std::string outputfile, int verbosity = 0)
   // SVTX evaluation
   //----------------
 
-  // SubsysReco* eval = new SvtxEvaluator("SVTXEVALUATOR", outputfile.c_str());
-  // eval->do_cluster_eval(false);
-  // eval->do_g4hit_eval(false);
-  // eval->do_hit_eval(false);
-  // eval->do_gpoint_eval(false);
-  // eval->Verbosity(verbosity);
-  // se->registerSubsystem( eval );
+  //SvtxEvaluator* eval = new SvtxEvaluator("SVTXEVALUATOR", outputfile.c_str());
+  //eval->do_cluster_eval(false);
+  //eval->do_g4hit_eval(false);
+  //eval->do_hit_eval(false);
+  //eval->do_gpoint_eval(false);
+  //eval->Verbosity(verbosity);
+  //se->registerSubsystem( eval );
 
-  MomentumEvaluator* eval = new MomentumEvaluator(outputfile.c_str(),0.1,0.2,62,2,56,10.,80.);
+  MomentumEvaluator* eval = new MomentumEvaluator(outputfile.c_str(),0.1,0.2,63,2,56,10.,80.);
   se->registerSubsystem( eval );
   
   return;

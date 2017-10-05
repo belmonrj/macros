@@ -1,10 +1,14 @@
 
 int Fun4All_G4_fsPHENIX(
 		       const int nEvents = 2,
-		       const char * inputFile = "/gpfs02/phenix/prod/sPHENIX/preCDR/pro.1-beta.5/single_particle/spacal1d/fieldmap/G4Hits_sPHENIX_e-_eta0_16GeV.root",
-		       const char * outputFile = "G4fsPHENIX.root"
+           const char * inputFile = "/sphenix/sim//sim01/production/2016-07-21/single_particle/spacal2d/fieldmap/G4Hits_sPHENIX_e-_eta0_8GeV-0002.root",
+		       const char * outputFile = "G4fsPHENIX.root",
+           const char * embed_input_file = "/sphenix/sim/sim01/production/2016-07-12/sHijing/spacal2d/G4Hits_sPHENIX_sHijing-0-4.4fm.list"
 		       )
 {
+  // Set the number of TPC layer
+  const int n_TPC_layers = 40;  // use 60 for backward compatibility only
+
   //===============
   // Input options
   //===============
@@ -21,6 +25,11 @@ int Fun4All_G4_fsPHENIX(
   // Use particle generator
   const bool runpythia8 = false;
   const bool runpythia6 = false;
+  // And
+  // Further choose to embed newly simulated events to a previous simulation. Not compatible with `readhits = true`
+  // In case embedding into a production output, please double check your G4Setup_sPHENIX.C and G4_*.C consistent with those in the production macro folder
+  // E.g. /sphenix/sim//sim01/production/2016-07-21/single_particle/spacal2d/
+  const bool do_embedding = false;
 
   //======================
   // What to run
@@ -31,54 +40,53 @@ int Fun4All_G4_fsPHENIX(
   bool do_pipe = true;
   
   bool do_svtx = true;
-  bool do_svtx_cell = false;
-  bool do_svtx_track = false;
-  bool do_svtx_eval = false;
+  bool do_svtx_cell = do_svtx && true;
+  bool do_svtx_track = do_svtx_cell && true;
+  bool do_svtx_eval = do_svtx_track && false;
 
-  bool do_preshower = false;
-  
   bool do_cemc = true;
-  bool do_cemc_cell = true;
-  bool do_cemc_twr = true;
-  bool do_cemc_cluster = true;
-  bool do_cemc_eval = false;
+  bool do_cemc_cell = do_cemc && true;
+  bool do_cemc_twr = do_cemc_cell && true;
+  bool do_cemc_cluster = do_cemc_twr && true;
+  bool do_cemc_eval = do_cemc_cluster && false;
 
   bool do_hcalin = true;
-  bool do_hcalin_cell = true;
-  bool do_hcalin_twr = true;
-  bool do_hcalin_cluster = true;
-  bool do_hcalin_eval = false;
+  bool do_hcalin_cell = do_hcalin && true;
+  bool do_hcalin_twr = do_hcalin_cell && true;
+  bool do_hcalin_cluster = do_hcalin_twr && true;
+  bool do_hcalin_eval = do_hcalin_cluster && false;
 
   bool do_magnet = true;
-  
+
   bool do_hcalout = true;
-  bool do_hcalout_cell = true;
-  bool do_hcalout_twr = true;
-  bool do_hcalout_cluster = true;
-  bool do_hcalout_eval = false;
-  
+  bool do_hcalout_cell = do_hcalout && true;
+  bool do_hcalout_twr = do_hcalout_cell && true;
+  bool do_hcalout_cluster = do_hcalout_twr && true;
+  bool do_hcalout_eval = do_hcalout_cluster && false;
+
   bool do_global = true;
   bool do_global_fastsim = false;
-  
+
   bool do_jet_reco = false;
-  bool do_jet_eval = false; 
+  bool do_jet_eval = do_jet_reco && true;
 
   bool do_fwd_jet_reco = true;
-  bool do_fwd_jet_eval = true;
+  bool do_fwd_jet_eval = do_fwd_jet_reco && true;
 
   // fsPHENIX geometry
 
   bool do_FGEM = true;
+  bool do_FGEM_track = do_FGEM &&  true;
 
-  bool do_FEMC = true; 
-  bool do_FEMC_cell = true; 
-  bool do_FEMC_twr = true;  
-  bool do_FEMC_cluster = true; 
+  bool do_FEMC = true;
+  bool do_FEMC_cell = do_FEMC && true;
+  bool do_FEMC_twr = do_FEMC_cell && true;
+  bool do_FEMC_cluster = do_FEMC_twr && true;
 
-  bool do_FHCAL = true; 
-  bool do_FHCAL_cell = true; 
-  bool do_FHCAL_twr = true; 
-  bool do_FHCAL_cluster = true; 
+  bool do_FHCAL = true;
+  bool do_FHCAL_cell = do_FHCAL && true;
+  bool do_FHCAL_twr = do_FHCAL_cell && true;
+  bool do_FHCAL_cluster = do_FHCAL_twr && true;
 
   bool do_dst_compress = false;
   
@@ -98,7 +106,7 @@ int Fun4All_G4_fsPHENIX(
 
   // establish the geometry and reconstruction setup
   gROOT->LoadMacro("G4Setup_fsPHENIX.C");
-  G4Init(do_svtx,do_preshower,do_cemc,do_hcalin,do_magnet,do_hcalout,do_pipe,do_FGEM,do_FEMC,do_FHCAL);
+  G4Init(do_svtx,do_cemc,do_hcalin,do_magnet,do_hcalout,do_pipe,do_FGEM,do_FEMC,do_FHCAL,n_TPC_layers);
 
   int absorberactive = 0; // set to 1 to make all absorbers active volumes
   //  const string magfield = "1.5"; // if like float -> solenoidal field in T, if string use as fieldmap name (including path)
@@ -132,6 +140,11 @@ int Fun4All_G4_fsPHENIX(
     {
       // Get the hits from a file
       // The input manager is declared later
+      if (do_embedding)
+       {
+         cout <<"Do not support read hits and embed background at the same time."<<endl;
+         exit(1);
+       }
     }
   else if (readhepmc)
     {
@@ -170,7 +183,7 @@ int Fun4All_G4_fsPHENIX(
       //gen->add_particles("e-",5); // mu+,e+,proton,pi+,Upsilon
       //gen->add_particles("e+",5); // mu-,e-,anti_proton,pi-
       gen->add_particles("pi-",1); // mu-,e-,anti_proton,pi-
-      if (readhepmc) {
+      if (readhepmc || do_embedding) {
 	gen->set_reuse_existing_vertex(true);
 	gen->set_existing_vertex_offset_vector(0.0,0.0,0.0);
       } else {
@@ -199,7 +212,7 @@ int Fun4All_G4_fsPHENIX(
       //---------------------
 
       G4Setup(absorberactive, magfield, TPythia6Decayer::kAll,
-	      do_svtx, do_preshower, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,
+	      do_svtx, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,
 	      do_FGEM, do_FEMC, do_FHCAL,
 	      magfield_rescale);
       
@@ -262,6 +275,12 @@ int Fun4All_G4_fsPHENIX(
 
   if (do_svtx_track) Svtx_Reco();
 
+  //--------------
+  // FGEM tracking
+  //--------------
+
+  if(do_FGEM_track) FGEM_FastSim_Reco();
+
   //-----------------
   // Global Vertexing
   //-----------------
@@ -320,6 +339,19 @@ int Fun4All_G4_fsPHENIX(
       hitsin->fileopen(inputFile);
       se->registerInputManager(hitsin);
     }
+  if (do_embedding)
+    {
+      if (embed_input_file == NULL)
+        {
+          cout << "Missing embed_input_file! Exit";
+          exit(3);
+        }
+
+      Fun4AllDstInputManager *in1 = new Fun4AllNoSyncDstInputManager("DSTinEmbed");
+      //      in1->AddFile(embed_input_file); // if one use a single input file
+      in1->AddListFile(embed_input_file); // RecommendedL: if one use a text list of many input files
+      se->registerInputManager(in1);
+    }
   if (readhepmc)
     {
       Fun4AllInputManager *in = new Fun4AllHepMCInputManager( "DSTIN");
@@ -342,7 +374,6 @@ int Fun4All_G4_fsPHENIX(
       G4DSTreader_fsPHENIX( outputFile, //
           /*int*/ absorberactive ,
           /*bool*/ do_svtx ,
-          /*bool*/ do_preshower ,
           /*bool*/ do_cemc ,
           /*bool*/ do_hcalin ,
           /*bool*/ do_magnet ,

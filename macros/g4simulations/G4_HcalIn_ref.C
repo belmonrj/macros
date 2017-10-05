@@ -1,11 +1,12 @@
+//Inner HCal construction macro
 
-int Min_hcal_in_layer = 0;
-int Max_hcal_in_layer = 0;
+//Inner HCal absorber material selector:
+//false - Default, absorber material is SS310
+//true - Choose if you want Aluminum
+const bool inner_hcal_material_Al = false;
 
-void HCalInnerInit() {
-  Min_hcal_in_layer = 0;
-  Max_hcal_in_layer = 0;
-}
+// Init is called by G4Setup.C
+void HCalInnerInit() {}
 
 double HCalInner(PHG4Reco* g4Reco,
 		 double radius,
@@ -17,43 +18,56 @@ double HCalInner(PHG4Reco* g4Reco,
   gSystem->Load("libg4detectors.so");
   gSystem->Load("libg4testbench.so");
 
-  int ilayer = Min_hcal_in_layer;
-  PHG4InnerHcalSubsystem *hcal;
-  hcal = new PHG4InnerHcalSubsystem("HCALIN");
-  // these are the parameters you can change with their defaults
-  // hcal->set_string_param("material","SS310");
-  // hcal->set_int_param("ncross",4);
-  // hcal->set_int_param("n_scinti_plates",5 * 64);
-  // hcal->set_int_param("n_scinti_tiles",12);
-  // hcal->set_int_param("light_scint_model",1);
-  // hcal->set_double_param("inner_radius",116);
-  // hcal->set_double_param("outer_radius",136);
-  // hcal->set_double_param("scinti_inner_gap",0.85);
-  // hcal->set_double_param("scinti_outer_gap",1.22);
-  // hcal->set_double_param("scinti_tile_thickness",0.7);
-  // hcal->set_double_param("scinti_gap_neighbor",0.1);
-  // the SetLightCorrection is a convenience method, no
-  // point in forcing users to set all 4 of them separately
-  // and maybe forgetting one
-  // hcal->SetLightCorrection(NAN,NAN,NAN,NAN);
-  // hcal->set_double_param("place_x",0);
-  // hcal->set_double_param("place_y",0);
-  // hcal->set_double_param("place_z",0);
-  // hcal->set_double_param("rot_x",0);
-  // hcal->set_double_param("rot_y",0);
-  // hcal->set_double_param("rot_z",0);
 
+  PHG4InnerHcalSubsystem *hcal = new PHG4InnerHcalSubsystem("HCALIN");
+  // these are the parameters you can change with their default settings
+  // hcal->set_string_param("material","SS310");
+  if(inner_hcal_material_Al)
+    {
+      cout <<"HCalInner - construct inner HCal absorber with G4_Al"<<endl;
+      hcal->set_string_param("material","G4_Al");
+    }
+  // hcal->set_double_param("inner_radius", 117.27);
+  //-----------------------------------------
+  // the light correction can be set in a single call
+  // hcal->set_double_param("light_balance_inner_corr", NAN);
+  // hcal->set_double_param("light_balance_inner_radius", NAN);
+  // hcal->set_double_param("light_balance_outer_corr", NAN);
+  // hcal->set_double_param("light_balance_outer_radius", NAN);
+  // hcal->SetLightCorrection(NAN,NAN,NAN,NAN);
+  //-----------------------------------------
+  // hcal->set_double_param("outer_radius", 134.42);
+  // hcal->set_double_param("place_x", 0.);
+  // hcal->set_double_param("place_y", 0.);
+  // hcal->set_double_param("place_z", 0.);
+  // hcal->set_double_param("rot_x", 0.);
+  // hcal->set_double_param("rot_y", 0.);
+  // hcal->set_double_param("rot_z", 0.);
+  // hcal->set_double_param("scinti_eta_coverage", 1.1);
+  // hcal->set_double_param("scinti_gap_neighbor", 0.1);
+  // hcal->set_double_param("scinti_inner_gap", 0.85);
+  // hcal->set_double_param("scinti_outer_gap", 1.22 * (5.0 / 4.0));
+  // hcal->set_double_param("scinti_outer_radius", 133.3);
+  // hcal->set_double_param("scinti_tile_thickness", 0.7);
+  // hcal->set_double_param("size_z", 175.94 * 2);
+  // hcal->set_double_param("steplimits", NAN);
+  // hcal->set_double_param("tilt_angle", 36.15);
+
+  // hcal->set_int_param("light_scint_model", 1);
+  // hcal->set_int_param("ncross", 0);
+  // hcal->set_int_param("n_towers", 64);
+  // hcal->set_int_param("n_scinti_plates_per_tower", 4);
+  // hcal->set_int_param("n_scinti_tiles", 12);
+
+  // hcal->set_string_param("material", "SS310");
+  
   hcal->SetActive();
   hcal->SuperDetector("HCALIN");
-  if (absorberactive)  hcal->SetAbsorberActive();
+  if (absorberactive)  
+    {
+      hcal->SetAbsorberActive();
+    }
   hcal->OverlapCheck(overlapcheck);
-  double innerradius = hcal->get_double_param("inner_radius");
-  if (radius > innerradius) {
-    cout << "inconsistency: radius: " << radius 
-	 << " larger than HCALIN inner radius: " << innerradius
-	 << " cm" << endl;
-    gSystem->Exit(-1);
-  }
 
   g4Reco->registerSubsystem( hcal );
 
@@ -61,14 +75,6 @@ double HCalInner(PHG4Reco* g4Reco,
 
   HCalInner_SupportRing(g4Reco,absorberactive);
   
-  if (verbosity > 0) {
-    cout << "==================== G4_HcalIn_ref.C::HCalInner() =========================" << endl;
-    cout << " HCALIN Material Description:" << endl;
-    cout << "  inner radius = " << innerradius << " cm" << endl;
-    cout << "  outer radius = " << radius << " cm" << endl;
-    cout << "===========================================================================" << endl;
-  }
-
   radius += no_overlapp;
   return radius;
 }
@@ -94,15 +100,17 @@ void HCalInner_SupportRing(PHG4Reco* g4Reco,
   for (int i = 0; i < 4; i++)
     {
       cyl = new PHG4CylinderSubsystem("HCALIN_SPT_N1", i);
-      cyl->SetPosition(0, 0, z_rings[i]);
+      cyl->set_double_param("place_z",z_rings[i]);
       cyl->SuperDetector("HCALIN_SPT");
-      cyl->SetRadius(innerradius);
-      cyl->SetLengthViaRapidityCoverage(false);
-      cyl->SetLength(dz);
-      cyl->SetMaterial("SS310");
-      cyl->SetThickness(maxradius - innerradius);
+      cyl->set_double_param("radius",innerradius);
+      cyl->set_int_param("lengthviarapidity",0);
+      cyl->set_double_param("length",dz);
+      cyl->set_string_param("material","SS310");
+      cyl->set_double_param("thickness",maxradius - innerradius);
       if (absorberactive)
-        cyl->SetActive();
+	{
+	  cyl->SetActive();
+	}
       g4Reco->registerSubsystem(cyl);
     }
   
@@ -116,10 +124,17 @@ void HCALInner_Cells(int verbosity = 0) {
   gSystem->Load("libg4detectors.so");
   Fun4AllServer *se = Fun4AllServer::instance();
 
-  PHG4HcalCellReco *hc = new PHG4HcalCellReco();
+  PHG4HcalCellReco *hc = new PHG4HcalCellReco("HCALIN_CELLRECO");
   hc->Detector("HCALIN");
-  hc->etasize_nslat(0, 0, 5);
-  hc->set_timing_window_size(60);
+  //  hc->Verbosity(2);
+  // check for energy conservation - needs modified "infinite" timing cuts
+  // 0-999999999 
+  //  hc->checkenergy();
+  // timing cuts with their default settings
+  // hc->set_double_param("tmin",0.); 
+  // hc->set_double_param("tmax",60.0); 
+  // or all at once:
+  // hc->set_timing_window(0.0,60.0);
   se->registerSubsystem(hc);
   
   return;  
@@ -131,25 +146,40 @@ void HCALInner_Towers(int verbosity = 0) {
   gSystem->Load("libg4detectors.so");
   Fun4AllServer *se = Fun4AllServer::instance();
   
-  RawTowerBuilder *TowerBuilder = new RawTowerBuilder("HcalInRawTowerBuilder");
+  HcalRawTowerBuilder *TowerBuilder = new HcalRawTowerBuilder("HcalInRawTowerBuilder");
   TowerBuilder->Detector("HCALIN");
   TowerBuilder->set_sim_tower_node_prefix("SIM");
   TowerBuilder->Verbosity(verbosity);
   se->registerSubsystem( TowerBuilder );
 
+  // From 2016 Test beam sim
   RawTowerDigitizer *TowerDigitizer = new RawTowerDigitizer("HcalInRawTowerDigitizer");
   TowerDigitizer->Detector("HCALIN");
-  TowerDigitizer->Verbosity(verbosity);
-  TowerDigitizer->set_digi_algorithm(RawTowerDigitizer::kNo_digitalization);
-  se->registerSubsystem( TowerDigitizer );
+//  TowerDigitizer->set_raw_tower_node_prefix("RAW_LG");
+  TowerDigitizer->set_digi_algorithm(
+       RawTowerDigitizer::kSimple_photon_digitalization);
+  TowerDigitizer->set_pedstal_central_ADC(0);
+  TowerDigitizer->set_pedstal_width_ADC(1); // From Jin's guess. No EMCal High Gain data yet! TODO: update
+  TowerDigitizer->set_photonelec_ADC(32. / 5.);
+  TowerDigitizer->set_photonelec_yield_visible_GeV(32. / 5 / (0.4e-3));
+  TowerDigitizer->set_zero_suppression_ADC(-0); // no-zero suppression
+  se->registerSubsystem(TowerDigitizer);
+
+  //Default sampling fraction for SS310
+  double visible_sample_fraction_HCALIN = 0.0631283 ; //, /gpfs/mnt/gpfs04/sphenix/user/jinhuang/prod_analysis/hadron_shower_res_nightly/./G4Hits_sPHENIX_pi-_eta0_16GeV-0000.root_qa.rootQA_Draw_HCALIN_G4Hit.pdf
+
+  if(inner_hcal_material_Al) visible_sample_fraction_HCALIN = 0.162166; //for "G4_Al", Abhisek Sen <sen.abhisek@gmail.com>
 
   RawTowerCalibration *TowerCalibration = new RawTowerCalibration("HcalInRawTowerCalibration");
   TowerCalibration->Detector("HCALIN");
-  TowerCalibration->Verbosity(verbosity);
+//  TowerCalibration->set_raw_tower_node_prefix("RAW_LG");
+//  TowerCalibration->set_calib_tower_node_prefix("CALIB_LG");
   TowerCalibration->set_calib_algorithm(RawTowerCalibration::kSimple_linear_calibration);
-  TowerCalibration->set_calib_const_GeV_ADC(1./0.067);// muon sampling fraction from Abhisek Sen, 2015 SBU simulation workfest
+  TowerCalibration->set_calib_const_GeV_ADC(0.4e-3 / visible_sample_fraction_HCALIN);
   TowerCalibration->set_pedstal_ADC(0);
-  se->registerSubsystem( TowerCalibration );
+  TowerCalibration->set_zero_suppression_GeV(-1); // no-zero suppression
+  se->registerSubsystem(TowerCalibration);
+
   return;
 }
 

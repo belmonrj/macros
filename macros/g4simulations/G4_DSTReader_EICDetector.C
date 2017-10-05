@@ -1,33 +1,36 @@
 //////////////////////////////////////////////////////////////////
 /*!
- \file G4_DSTReader.C
- \brief Convert DST to human command readable TTree for quick poke around the outputs
- \author  Jin Huang
- \version $Revision:  $
- \date    $Date: $
- */
+  \file G4_DSTReader.C
+  \brief Convert DST to human command readable TTree for quick poke around the outputs
+  \author  Jin Huang
+  \version $Revision:  $
+  \date    $Date: $
+*/
 //////////////////////////////////////////////////////////////////
 
 #include <string>
 
 void
-G4DSTreader_fsPHENIX( const char * outputFile = "G4sPHENIXCells.root",//
-    int absorberactive = 1, //
-    bool do_svtx = true, //
-    bool do_cemc = true, //
-    bool do_hcalin = true, //
-    bool do_magnet = true, //
-    bool do_hcalout = true, //
-    bool do_cemc_twr = true, //
-    bool do_hcalin_twr = true, //
-    bool do_magnet = true, //
-    bool do_hcalout_twr = true, //
-    bool do_FGEM = true, //
-    bool do_FHCAL = true, //
-    bool do_FHCAL_twr = true, //
-    bool do_FEMC = true, //
-    bool do_FEMC_twr = true //
-    )
+G4DSTreader_EICDetector( const char * outputFile = "G4sPHENIXCells.root",//
+                         int absorberactive = 1, //
+                         bool do_svtx = true, //
+                         bool do_cemc = true, //
+                         bool do_hcalin = true, //
+                         bool do_magnet = true, //
+                         bool do_hcalout = true, //
+                         bool do_cemc_twr = true, //
+                         bool do_hcalin_twr = true, //
+                         bool do_magnet = true, //
+                         bool do_hcalout_twr = true, //
+                         bool do_FGEM = true, //
+                         bool do_EGEM = true, //
+                         bool do_FHCAL = true, //
+                         bool do_FHCAL_twr = true, //
+                         bool do_FEMC = true, //
+                         bool do_FEMC_twr = true, //
+                         bool do_EEMC = true, //
+                         bool do_EEMC_twr = true //
+                         )
 {
 
   //! debug output on screen?
@@ -38,7 +41,7 @@ G4DSTreader_fsPHENIX( const char * outputFile = "G4sPHENIXCells.root",//
 
   // save a comprehensive  evaluation file
   PHG4DSTReader* ana = new PHG4DSTReader(
-      string(outputFile) + string("_DSTReader.root"));
+                                         string(outputFile) + string("_DSTReader.root"));
   ana->set_save_particle(true);
   ana->set_load_all_particle(false);
   ana->set_load_active_particle(true);
@@ -101,6 +104,13 @@ G4DSTreader_fsPHENIX( const char * outputFile = "G4sPHENIXCells.root",//
             ana->AddNode("ABSORBER_FEMC");
         }
 
+      if (do_EEMC)
+        {
+          ana->AddNode("EEMC");
+          if (absorberactive)
+            ana->AddNode("ABSORBER_EEMC");
+        }
+
       if (do_FGEM)
         {
           ana->AddNode("FGEM_0");
@@ -108,6 +118,13 @@ G4DSTreader_fsPHENIX( const char * outputFile = "G4sPHENIXCells.root",//
           ana->AddNode("FGEM_2");
           ana->AddNode("FGEM_3");
           ana->AddNode("FGEM_4");
+        }
+
+      if (do_EGEM)
+        {
+          ana->AddNode("EGEM_0");
+          ana->AddNode("EGEM_1");
+          ana->AddNode("EGEM_2");
         }
 
       ana->AddNode("BH_1");
@@ -147,18 +164,24 @@ G4DSTreader_fsPHENIX( const char * outputFile = "G4sPHENIXCells.root",//
       ana->AddTower("RAW_FEMC");
       ana->AddTower("CALIB_FEMC");
     }
+  if (do_EEMC_twr)
+    {
+      ana->AddTower("SIM_EEMC");
+      ana->AddTower("RAW_EEMC");
+      ana->AddTower("CALIB_EEMC");
+    }
 
   // Jets disabled for now
-//  if (do_jet_reco)
-//    {
-//
-//      ana->AddJet("AntiKt06JetsInPerfect");
-//      ana->AddJet("G4TowerJets_6");
-//    }
-//  if (embed_input_file && do_jet_reco)
-//    {
-//      ana->AddJet("G4TowerJets_combined_6");
-//    }
+  //  if (do_jet_reco)
+  //    {
+  //
+  //      ana->AddJet("AntiKt06JetsInPerfect");
+  //      ana->AddJet("G4TowerJets_6");
+  //    }
+  //  if (embed_input_file && do_jet_reco)
+  //    {
+  //      ana->AddJet("G4TowerJets_combined_6");
+  //    }
 
   Fun4AllServer *se = Fun4AllServer::instance();
   se->registerSubsystem(ana);

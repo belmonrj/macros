@@ -1,4 +1,5 @@
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,00,0)
+#include <phool/PHRandomSeed.h>
 #include <fun4all/SubsysReco.h>
 #include <fun4all/Fun4AllServer.h>
 #include <fun4all/Fun4AllInputManager.h>
@@ -25,6 +26,8 @@
 #include "G4_CaloTrigger.C"
 #include "G4_Jets.C"
 #include "G4_HIJetReco.C"
+#include "G4_TopoClusterReco.C"
+#include "G4_ParticleFlow.C"
 #include "G4_DSTReader.C"
 #include "DisplayOn.C"
 R__LOAD_LIBRARY(libfun4all.so)
@@ -41,7 +44,7 @@ int Fun4All_G4_sPHENIX(
     const int nEvents = 1,
     const char *inputFile = "/sphenix/data/data02/review_2017-08-02/single_particle/spacal2d/fieldmap/G4Hits_sPHENIX_e-_eta0_8GeV-0002.root",
     const char *outputFile = "G4sPHENIX.root",
-    const char *embed_input_file = "/sphenix/data/data02/review_2017-08-02/sHijing/fm_0-4.list")
+    const char *embed_input_file = "https://www.phenix.bnl.gov/WWW/publish/phnxbld/sPHENIX/files/sPHENIX_G4Hits_sHijing_9-11fm_00000_00010.root")
 {
 
   //===============
@@ -81,6 +84,10 @@ int Fun4All_G4_sPHENIX(
   // Event pile up simulation with collision rate in Hz MB collisions.
   // Note please follow up the macro to verify the settings for beam parameters
   const double pileup_collision_rate = 0;  // 100e3 for 100kHz nominal AuAu collision rate.
+  const bool do_write_output = false;
+  // To write cluster files set do_write_output = true and set 
+  // do_tracking = true, do_tracking_cell = true, do_tracking_cluster = true and 
+  // leave the tracking for later do_tracking_track =  false,  do_tracking_eval = false
 
   //======================
   // What to run
@@ -89,10 +96,12 @@ int Fun4All_G4_sPHENIX(
   bool do_bbc = true;
 
   bool do_pipe = true;
+  bool do_mvtxservice = true;
 
   bool do_tracking = true;
   bool do_tracking_cell = do_tracking && true;
-  bool do_tracking_track = do_tracking_cell && true;
+  bool do_tracking_cluster = do_tracking_cell && true;
+  bool do_tracking_track = do_tracking_cluster && true;
   bool do_tracking_eval = do_tracking_track && true;
 
   bool do_pstof = false;
@@ -117,6 +126,15 @@ int Fun4All_G4_sPHENIX(
   bool do_hcalout_cluster = do_hcalout_twr && true;
   bool do_hcalout_eval = do_hcalout_cluster && true;
 
+  // forward EMC
+  bool do_femc = false;
+  bool do_femc_cell = do_femc && true;
+  bool do_femc_twr = do_femc_cell && true;
+  bool do_femc_cluster = do_femc_twr && true;
+  bool do_femc_eval = do_femc_cluster && true;
+
+  bool do_epd = false;
+
   //! forward flux return plug door. Out of acceptance and off by default.
   bool do_plugdoor = false;
 
@@ -133,6 +151,11 @@ int Fun4All_G4_sPHENIX(
   // simulations which don't particularly care about jets)
   bool do_HIjetreco = false && do_cemc_twr && do_hcalin_twr && do_hcalout_twr;
 
+  // 3-D topoCluster reconstruction, potentially in all calorimeter layers
+  bool do_topoCluster = false && do_cemc_twr && do_hcalin_twr && do_hcalout_twr;
+  // particle flow jet reconstruction - needs topoClusters!
+  bool do_particle_flow = false && do_topoCluster;
+
   bool do_dst_compress = false;
 
   //Option to convert DST to human command readable TTree for quick poke around the outputs
@@ -145,12 +168,11 @@ int Fun4All_G4_sPHENIX(
   gSystem->Load("libg4detectors.so");
   gSystem->Load("libphhepmc.so");
   gSystem->Load("libg4testbench.so");
-  gSystem->Load("libg4hough.so");
   gSystem->Load("libg4eval.so");
   gSystem->Load("libg4intt.so");
   // establish the geometry and reconstruction setup
   gROOT->LoadMacro("G4Setup_sPHENIX.C");
-  G4Init(do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe, do_plugdoor);
+  G4Init(do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe, do_plugdoor, do_femc, do_epd, do_mvtxservice);
 
   int absorberactive = 1;  // set to 1 to make all absorbers active volumes
   //  const string magfield = "1.5"; // alternatively to specify a constant magnetic field, give a float number, which will be translated to solenoidal field in T, if string use as fieldmap name (including path)
@@ -169,17 +191,21 @@ int Fun4All_G4_sPHENIX(
 
   Fun4AllServer *se = Fun4AllServer::instance();
   se->Verbosity(0);
+
+  //Opt to print all random seed used for debugging reproducibility. Comment out to reduce stdout prints.
+  PHRandomSeed::Verbosity(1);
+
   // just if we set some flags somewhere in this macro
   recoConsts *rc = recoConsts::instance();
   // By default every random number generator uses
   // PHRandomSeed() which reads /dev/urandom to get its seed
   // if the RANDOMSEED flag is set its value is taken as seed
-  // You ca neither set this to a random value using PHRandomSeed()
+  // You can either set this to a random value using PHRandomSeed()
   // which will make all seeds identical (not sure what the point of
   // this would be:
   //  rc->set_IntFlag("RANDOMSEED",PHRandomSeed());
   // or set it to a fixed value so you can debug your code
-  //  rc->set_IntFlag("RANDOMSEED", 12345);
+  //rc->set_IntFlag("RANDOMSEED", 12345);
 
   //-----------------
   // Event generation
@@ -339,10 +365,10 @@ int Fun4All_G4_sPHENIX(
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,00,0)
     G4Setup(absorberactive, magfield, EDecayType::kAll,
-            do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,do_plugdoor, magfield_rescale);
+            do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,do_plugdoor, do_femc, do_epd, do_mvtxservice, magfield_rescale);
 #else
     G4Setup(absorberactive, magfield, TPythia6Decayer::kAll,
-            do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,do_plugdoor, magfield_rescale);
+            do_tracking, do_pstof, do_cemc, do_hcalin, do_magnet, do_hcalout, do_pipe,do_plugdoor, do_femc, do_epd, do_mvtxservice, magfield_rescale);
 #endif
   }
 
@@ -368,6 +394,8 @@ int Fun4All_G4_sPHENIX(
 
   if (do_hcalout_cell) HCALOuter_Cells();
 
+  if (do_femc_cell) FEMC_Cells();
+
   //-----------------------------
   // CEMC towering and clustering
   //-----------------------------
@@ -385,11 +413,23 @@ int Fun4All_G4_sPHENIX(
   if (do_hcalout_twr) HCALOuter_Towers();
   if (do_hcalout_cluster) HCALOuter_Clusters();
 
+  // if enabled, do topoClustering early, upstream of any possible jet reconstruction
+  if (do_topoCluster)
+  {
+    gROOT->LoadMacro("G4_TopoClusterReco.C");
+    TopoClusterReco();
+  }
+
+  if (do_femc_twr) FEMC_Towers();
+  if (do_femc_cluster) FEMC_Clusters();
+
   if (do_dst_compress) ShowerCompress();
 
   //--------------
   // SVTX tracking
   //--------------
+
+  if (do_tracking_cluster) Tracking_Clus();
 
   if (do_tracking_track) Tracking_Reco();
 
@@ -435,6 +475,11 @@ int Fun4All_G4_sPHENIX(
     HIJetReco();
   }
 
+  if (do_particle_flow) {
+    gROOT->LoadMacro("G4_ParticleFlow.C");
+    ParticleFlow();
+  }
+
   //----------------------
   // Simulation evaluation
   //----------------------
@@ -446,6 +491,8 @@ int Fun4All_G4_sPHENIX(
   if (do_hcalin_eval) HCALInner_Eval(string(outputFile) + "_g4hcalin_eval.root");
 
   if (do_hcalout_eval) HCALOuter_Eval(string(outputFile) + "_g4hcalout_eval.root");
+
+  if (do_femc_eval) FEMC_Eval(string(outputFile) + "_g4femc_eval.root");
 
   if (do_jet_eval) Jet_Eval(string(outputFile) + "_g4jet_eval.root");
 
@@ -476,8 +523,9 @@ int Fun4All_G4_sPHENIX(
     gSystem->Load("libg4dst.so");
 
     Fun4AllDstInputManager *in1 = new Fun4AllNoSyncDstInputManager("DSTinEmbed");
-    //      in1->AddFile(embed_input_file); // if one use a single input file
-    in1->AddListFile(embed_input_file);  // RecommendedL: if one use a text list of many input files
+    in1->AddFile(embed_input_file); // if one use a single input file
+//    in1->AddListFile(embed_input_file);  // Recommended: if one use a text list of many input files
+    in1->Repeat(); // if file(or filelist) is exhausted, start from beginning
     se->registerInputManager(in1);
   }
 
@@ -512,8 +560,10 @@ int Fun4All_G4_sPHENIX(
     // pile up simulation.
     // add random beam collisions following a collision diamond and rate from a HepMC stream
     Fun4AllHepMCPileupInputManager *pileup = new Fun4AllHepMCPileupInputManager("HepMCPileupInput");
+    pileup->set_vertex_distribution_function(PHHepMCGenHelper::Gaus, PHHepMCGenHelper::Gaus, PHHepMCGenHelper::Gaus, PHHepMCGenHelper::Gaus);
+    pileup->set_vertex_distribution_mean(0, 0, 0, 0);
+    pileup->set_vertex_distribution_width(100e-4, 100e-4, 30, 5);
     se->registerInputManager(pileup);
-
     const string pileupfile("/sphenix/sim/sim01/sHijing/sHijing_0-12fm.dat");
     //background files for p+p pileup sim
     //const string pileupfile("/gpfs/mnt/gpfs04/sphenix/user/shlim/04.InnerTrackerTaskForce/01.PythiaGen/list_pythia8_mb.dat");
@@ -530,9 +580,9 @@ int Fun4All_G4_sPHENIX(
       // This gets the default drift velocity only! 
       PHG4TpcElectronDrift *dr = (PHG4TpcElectronDrift *)se->getSubsysReco("PHG4TpcElectronDrift");
       assert(dr);
-      double TPCDriftVelocity = dr->get_double_param("drift_velocity");
-      time_window_minus = -105.5 / TPCDriftVelocity;  // ns
-      time_window_plus = 105.5 / TPCDriftVelocity;    // ns;
+      double TpcDriftVelocity = dr->get_double_param("drift_velocity");
+      time_window_minus = -105.5 / TpcDriftVelocity;  // ns
+      time_window_plus = 105.5 / TpcDriftVelocity;    // ns;
     }
     pileup->set_time_window(time_window_minus, time_window_plus);  // override timing window in ns
     cout << "Collision pileup enabled using file " << pileupfile << " with collision rate " << pileup_collision_rate
@@ -552,15 +602,17 @@ int Fun4All_G4_sPHENIX(
                 /*bool*/ do_hcalin,
                 /*bool*/ do_magnet,
                 /*bool*/ do_hcalout,
+                /*bool*/ do_epd,
                 /*bool*/ do_cemc_twr,
                 /*bool*/ do_hcalin_twr,
                 /*bool*/ do_hcalout_twr);
   }
 
-  //  Fun4AllDstOutputManager *out = new Fun4AllDstOutputManager("DSTOUT", outputFile);
-  // if (do_dst_compress) DstCompress(out);
-  //  se->registerOutputManager(out);
-
+  if(do_write_output) {
+    Fun4AllDstOutputManager *out = new Fun4AllDstOutputManager("DSTOUT", outputFile);
+    if (do_dst_compress) DstCompress(out);
+    se->registerOutputManager(out);
+  }
   //-----------------
   // Event processing
   //-----------------

@@ -2,6 +2,7 @@
 #define MACRO_G4MVTX_C
 
 #include <GlobalVariables.C>
+#include <QA.C>
 
 #include <g4detectors/PHG4CylinderSubsystem.h>
 #include <g4mvtx/PHG4MvtxDefs.h>
@@ -12,6 +13,7 @@
 #include <g4main/PHG4Reco.h>
 
 #include <mvtx/MvtxClusterizer.h>
+#include <qa_modules/QAG4SimulationMvtx.h>
 
 #include <fun4all/Fun4AllServer.h>
 
@@ -20,6 +22,7 @@
 
 R__LOAD_LIBRARY(libg4mvtx.so)
 R__LOAD_LIBRARY(libmvtx.so)
+R__LOAD_LIBRARY(libqa_modules.so)
 
 namespace Enable
 {
@@ -27,6 +30,7 @@ namespace Enable
   bool MVTX_OVERLAPCHECK = false;
   bool MVTX_CELL = false;
   bool MVTX_CLUSTER = false;
+  bool MVTX_QA = false;
   bool MVTX_ABSORBER = false;
   bool MVTX_SERVICE = true;
   int MVTX_VERBOSITY = 0;
@@ -219,6 +223,13 @@ void Mvtx_Cells()
     maps_hits->set_timing_window(ilayer, -5000, 5000);
   }
   se->registerSubsystem(maps_hits);
+
+  PHG4MvtxDigitizer* digimvtx = new PHG4MvtxDigitizer();
+  digimvtx->Verbosity(verbosity);
+  // energy deposit in 25 microns = 9.6 KeV = 1000 electrons collected after recombination
+  //digimvtx->set_adc_scale(0.95e-6);  // default set in code is 0.95e-06, which is 99 electrons
+  se->registerSubsystem(digimvtx);
+
   return;
 }
 
@@ -226,16 +237,22 @@ void Mvtx_Clustering()
 {
   int verbosity = std::max(Enable::VERBOSITY, Enable::MVTX_VERBOSITY);
   Fun4AllServer* se = Fun4AllServer::instance();
-  PHG4MvtxDigitizer* digimvtx = new PHG4MvtxDigitizer();
-  digimvtx->Verbosity(verbosity);
-  // energy deposit in 25 microns = 9.6 KeV = 1000 electrons collected after recombination
-  //digimvtx->set_adc_scale(0.95e-6);  // default set in code is 0.95e-06, which is 99 electrons
-  se->registerSubsystem(digimvtx);
+
   // For the Mvtx layers
   //================
   MvtxClusterizer* mvtxclusterizer = new MvtxClusterizer("MvtxClusterizer");
   mvtxclusterizer->Verbosity(verbosity);
   se->registerSubsystem(mvtxclusterizer);
+}
+
+void Mvtx_QA()
+{
+  int verbosity = std::max(Enable::QA_VERBOSITY, Enable::MVTX_VERBOSITY);
+
+  Fun4AllServer* se = Fun4AllServer::instance();
+  QAG4SimulationMvtx* qa = new QAG4SimulationMvtx;
+  qa->Verbosity(verbosity);
+  se->registerSubsystem(qa);
 }
 
 #endif

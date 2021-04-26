@@ -3,6 +3,7 @@
 #define MACRO_G4HCALINREF_C
 
 #include <GlobalVariables.C>
+#include <QA.C>
 
 #include <g4calo/HcalRawTowerBuilder.h>
 #include <g4calo/RawTowerDigitizer.h>
@@ -18,6 +19,7 @@
 #include <caloreco/RawClusterBuilderGraph.h>
 #include <caloreco/RawClusterBuilderTemplate.h>
 #include <caloreco/RawTowerCalibration.h>
+#include <qa_modules/QAG4SimulationCalorimeter.h>
 
 #include <fun4all/Fun4AllServer.h>
 
@@ -25,6 +27,7 @@ R__LOAD_LIBRARY(libcalo_reco.so)
 R__LOAD_LIBRARY(libg4calo.so)
 R__LOAD_LIBRARY(libg4detectors.so)
 R__LOAD_LIBRARY(libg4eval.so)
+R__LOAD_LIBRARY(libqa_modules.so)
 
 void HCalInner_SupportRing(PHG4Reco *g4Reco);
 
@@ -37,6 +40,7 @@ namespace Enable
   bool HCALIN_TOWER = false;
   bool HCALIN_CLUSTER = false;
   bool HCALIN_EVAL = false;
+  bool HCALIN_QA = false;
   int HCALIN_VERBOSITY = 0;
 }  // namespace Enable
 
@@ -52,6 +56,15 @@ namespace G4HCALIN
   bool inner_hcal_material_Al = true;
 
   int inner_hcal_eic = 0;
+
+  // Digitization (default photon digi):
+  RawTowerDigitizer::enu_digi_algorithm TowerDigi = RawTowerDigitizer::kSimple_photon_digitization;
+  // directly pass the energy of sim tower to digitized tower
+  // kNo_digitization
+  // simple digitization with photon statistics, single amplitude ADC conversion and pedestal
+  // kSimple_photon_digitization
+  // digitization with photon statistics on SiPM with an effective pixel N, ADC conversion and pedestal
+  // kSiPM_photon_digitization
 
   enum enu_HCalIn_clusterizer
   {
@@ -233,7 +246,7 @@ void HCALInner_Towers()
   RawTowerDigitizer *TowerDigitizer = new RawTowerDigitizer("HcalInRawTowerDigitizer");
   TowerDigitizer->Detector("HCALIN");
   //  TowerDigitizer->set_raw_tower_node_prefix("RAW_LG");
-  TowerDigitizer->set_digi_algorithm(RawTowerDigitizer::kSimple_photon_digitalization);
+  TowerDigitizer->set_digi_algorithm(G4HCALIN::TowerDigi);
   TowerDigitizer->set_pedstal_central_ADC(0);
   TowerDigitizer->set_pedstal_width_ADC(1);  // From Jin's guess. No EMCal High Gain data yet! TODO: update
   TowerDigitizer->set_photonelec_ADC(32. / 5.);
@@ -251,7 +264,14 @@ void HCALInner_Towers()
   //  TowerCalibration->set_raw_tower_node_prefix("RAW_LG");
   //  TowerCalibration->set_calib_tower_node_prefix("CALIB_LG");
   TowerCalibration->set_calib_algorithm(RawTowerCalibration::kSimple_linear_calibration);
-  TowerCalibration->set_calib_const_GeV_ADC(0.4e-3 / visible_sample_fraction_HCALIN);
+  if (G4HCALIN::TowerDigi == RawTowerDigitizer::kNo_digitization)
+  {
+    TowerCalibration->set_calib_const_GeV_ADC(1. / visible_sample_fraction_HCALIN);
+  }
+  else
+  {
+    TowerCalibration->set_calib_const_GeV_ADC(0.4e-3 / visible_sample_fraction_HCALIN);
+  }
   TowerCalibration->set_pedstal_ADC(0);
   se->registerSubsystem(TowerCalibration);
 
@@ -268,7 +288,7 @@ void HCALInner_Clusters()
   {
     RawClusterBuilderTemplate *ClusterBuilder = new RawClusterBuilderTemplate("HcalInRawClusterBuilderTemplate");
     ClusterBuilder->Detector("HCALIN");
-    ClusterBuilder->SetCylindricalGeometry();
+    ClusterBuilder->SetCylindricalGeometry();  // has to be called after Detector()
     ClusterBuilder->Verbosity(verbosity);
     se->registerSubsystem(ClusterBuilder);
   }
@@ -298,4 +318,17 @@ void HCALInner_Eval(const std::string &outputfile)
 
   return;
 }
+
+void HCALInner_QA()
+{
+  int verbosity = std::max(Enable::QA_VERBOSITY, Enable::HCALIN_VERBOSITY);
+
+  Fun4AllServer *se = Fun4AllServer::instance();
+  QAG4SimulationCalorimeter *qa = new QAG4SimulationCalorimeter("HCALIN");
+  qa->Verbosity(verbosity);
+  se->registerSubsystem(qa);
+
+  return;
+}
+
 #endif
